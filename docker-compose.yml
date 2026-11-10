@@ -1,0 +1,24 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: bustrack-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bustrack
+      MYSQL_USER: bustrack
+      MYSQL_PASSWORD: bustrack
+      TZ: America/Bogota
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - bustrack_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      retries: 20
+
+volumes:
+  bustrack_data:

@@ -1,0 +1,170 @@
+import { useCallback, useEffect, useState } from 'react'
+import { BusFront, Printer, RefreshCw, Ticket, UserRound } from 'lucide-react'
+import { api } from '../lib/api.js'
+import { dayLabel, errMsg, hour, money, todayISO } from '../lib/format.js'
+import { AvailabilityBadge, searchQuery, TripSearchForm, TripSummary } from '../components/TripSearch.jsx'
+import SeatGrid from '../components/SeatGrid.jsx'
+import TicketModal from '../components/TicketModal.jsx'
+import { Alert, Empty, PageHeader, Spinner, StatusBadge } from '../components/ui.jsx'
+
+const POLL_MS = 4000
+const EMPTY_PAX = { passenger_name: '', passenger_doc: '' }
+
+/** HU03: venta de tiquete con grilla en tiempo real y sin doble venta. */
+export default function Taquilla() {
+  const [filters, setFilters] = useState({ origin: '', destination: '', date: todayISO() })
+  const [trips, setTrips] = useState(null)
+  const [tripId, setTripId] = useState(null)
+  const [seatData, setSeatData] = useState(null)
+  const [seat, setSeat] = useState(null)
+  const [pax, setPax] = useState(EMPTY_PAX)
+  const [selling, setSelling] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const [ticket, setTicket] = useState(null)
+  const [tickets, setTickets] = useState([])
+
+  const loadTrips = useCallback((f = filters) => api(searchQuery(f)).then(setTrips).catch((e) => setMsg({ type: 'error', text: errMsg(e) })), [filters])
+
+  const loadSeats = useCallback(async (id) => {
+    const d = await api(`/trips/${id}/seats`)
+    setSeatData(d)
+    setSeat((s) => {
+      if (s && d.seats[s - 1]?.status !== 'free') {
+        setMsg({ type: 'warn', text: `El asiento ${s} acaba de ser vendido por otra taquilla. Elige otro.` })
+        return null
+      }
+      return s
+    })
+  }, [])
+
+  const loadTickets = useCallback((id) => api(`/tickets?trip_id=${id}`).then(setTickets).catch(() => {}), [])
+
+  useEffect(() => { loadTrips() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!tripId) return
+    setSeatData(null)
+    loadSeats(tripId)
+    loadTickets(tripId)
+    const timer = setInterval(() => loadSeats(tripId).catch(() => {}), POLL_MS)
+    return () => clearInterval(timer)
+  }, [tripId, loadSeats, loadTickets])
+
+  const selectTrip = (id) => { setTripId(id); setSeat(null); setMsg(null) }
+
+  const sell = async (e) => {
+    e.preventDefault()
+    setSelling(true)
+    setMsg(null)
+    try {
+      const t = await api('/tickets', { method: 'POST', body: { trip_id: tripId, seat_number: seat, ...pax } })
+      setTicket(t)
+      setSeat(null)
+      setPax(EMPTY_PAX)
+      setMsg({ type: 'success', text: `Tiquete vendido: asiento ${t.seat_number} para ${t.passenger_name}.` })
+    } catch (err) {
+      setMsg({ type: 'error', text: errMsg(err) })
+      if (err.status === 409) setSeat(null)
+    } finally {
+      setSelling(false)
+      loadSeats(tripId)
+      loadTickets(tripId)
+      loadTrips()
+    }
+  }
+
+  const reprint = (uuid) => api(`/tickets/${uuid}`).then(setTicket).catch((e) => setMsg({ type: 'error', text: errMsg(e) }))
+  const trip = seatData?.trip
+
+  return (
+    <div>
+      <PageHeader title="Taquilla" subtitle="Selecciona un viaje, elige el asiento y registra al pasajero." />
+      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+        <aside className="space-y-4">
+          <div className="card p-4">
+            <TripSearchForm compact value={filters} onChange={setFilters} onSubmit={() => loadTrips()} />
+          </div>
+          <div className="card max-h-[60vh] divide-y divide-slate-100 overflow-y-auto">
+            {!trips ? <Spinner /> : trips.length === 0 ? (
+              <Empty icon={BusFront} title="Sin viajes disponibles">Cambia la fecha o los filtros.</Empty>
+            ) : trips.map((t) => (
+              <button key={t.id} onClick={() => selectTrip(t.id)}
+                className={`flex w-full items-center justify-between gap-2 p-3 text-left transition hover:bg-slate-50 ${t.id === tripId ? 'border-l-4 border-indigo-600 bg-indigo-50' : 'border-l-4 border-transparent'}`}>
+                <TripSummary trip={t} />
+                <AvailabilityBadge trip={t} />
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <section className="space-y-4">
+          {msg && <Alert type={msg.type} onClose={() => setMsg(null)}>{msg.text}</Alert>}
+          {!tripId ? (
+            <div className="card"><Empty icon={Ticket} title="Ningún viaje seleccionado">Elige un viaje de la lista para ver sus asientos.</Empty></div>
+          ) : !trip ? <div className="card"><Spinner /></div> : (
+            <>
+              <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
+                <div>
+                  <p className="text-xs text-slate-500">{trip.company_name} · Placa {trip.bus_plate || '—'} · {dayLabel(trip.departure_at)}</p>
+                  <p className="text-xl font-extrabold text-slate-900">{trip.origin} → {trip.destination} · {hour(trip.departure_at)}</p>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="flex items-center gap-1 text-slate-500"><RefreshCw size={14} className="animate-spin [animation-duration:3s]" /> En vivo</span>
+                  <span className="badge bg-indigo-100 text-indigo-700">{trip.available} libres de {trip.bus_capacity}</span>
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[auto_1fr]">
+                <div className="card p-4"><SeatGrid seats={seatData.seats} selected={seat} onSelect={setSeat} /></div>
+                <form onSubmit={sell} className="card space-y-4 p-4">
+                  <h3 className="flex items-center gap-2 font-bold"><UserRound size={18} /> Datos del pasajero</h3>
+                  {seat ? (
+                    <div className="rounded-lg bg-indigo-50 p-3 text-sm">
+                      Asiento seleccionado: <b className="text-indigo-700">#{seat}</b> · Valor: <b>{money(trip.fare)}</b>
+                    </div>
+                  ) : <Alert type="info">Selecciona un asiento libre en la grilla.</Alert>}
+                  <div>
+                    <label className="label">Nombre completo *</label>
+                    <input className="input" required minLength={3} value={pax.passenger_name}
+                      onChange={(e) => setPax({ ...pax, passenger_name: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="label">Documento de identidad *</label>
+                    <input className="input" required minLength={5} inputMode="numeric" value={pax.passenger_doc}
+                      onChange={(e) => setPax({ ...pax, passenger_doc: e.target.value })} />
+                  </div>
+                  <button className="btn btn-primary w-full py-3" disabled={!seat || selling}>
+                    <Ticket size={18} /> {selling ? 'Procesando...' : seat ? `Vender asiento ${seat} · ${money(trip.fare)}` : 'Vender tiquete'}
+                  </button>
+                </form>
+              </div>
+
+              <div className="card overflow-hidden">
+                <div className="border-b border-slate-200 px-4 py-3 font-bold">Pasajeros del viaje ({tickets.length})</div>
+                {tickets.length === 0 ? <p className="p-4 text-sm text-slate-500">Aún no hay tiquetes vendidos.</p> : (
+                  <div className="max-h-80 overflow-auto">
+                    <table className="w-full">
+                      <thead className="bg-slate-50"><tr><th className="th">Asiento</th><th className="th">Pasajero</th><th className="th">Documento</th><th className="th">Estado</th><th className="th" /></tr></thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {tickets.map((t) => (
+                          <tr key={t.uuid}>
+                            <td className="td font-bold">{t.seat_number}</td>
+                            <td className="td">{t.passenger_name}</td>
+                            <td className="td">{t.passenger_doc}</td>
+                            <td className="td"><StatusBadge status={t.status} /></td>
+                            <td className="td text-right"><button className="btn btn-ghost btn-sm" onClick={() => reprint(t.uuid)}><Printer size={14} /> Ver</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+      <TicketModal ticket={ticket} onClose={() => setTicket(null)} />
+    </div>
+  )
+}
