@@ -38,7 +38,7 @@ def run():
     random.seed(7)
     db = SessionLocal()
     db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
-    for table in ("tickets", "trips", "routes", "companies", "users"):
+    for table in ("seat_holds", "tickets", "trips", "routes", "companies", "users"):
         db.execute(text(f"TRUNCATE TABLE {table}"))
     db.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 

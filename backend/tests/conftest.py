@@ -25,7 +25,7 @@ from app.models import Company, Route, Trip, User  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
 SCHEMA = Path(__file__).resolve().parents[2] / "database" / "schema.sql"
-TABLES = ("tickets", "trips", "routes", "companies", "users")
+TABLES = ("seat_holds", "tickets", "trips", "routes", "companies", "users")
 PASSWORD = "clave123"
 PASSWORD_HASH = hash_password(PASSWORD)  # se calcula una sola vez (bcrypt es lento a propósito)
 TOMORROW = date.today() + timedelta(days=1)
@@ -34,11 +34,8 @@ TOMORROW = date.today() + timedelta(days=1)
 @pytest.fixture(scope="session", autouse=True)
 def schema():
     """Crea las tablas de prueba a partir del mismo schema.sql de producción."""
-    statements = []
-    for chunk in SCHEMA.read_text(encoding="utf-8").split(";"):
-        sql = "\n".join(line for line in chunk.splitlines() if not line.strip().startswith("--")).strip()
-        if sql:
-            statements.append(sql)
+    lines = [line for line in SCHEMA.read_text(encoding="utf-8").splitlines() if not line.strip().startswith("--")]
+    statements = [s.strip() for s in "\n".join(lines).split(";") if s.strip()]
     with engine.begin() as conn:
         conn.exec_driver_sql("SET FOREIGN_KEY_CHECKS = 0")
         for table in TABLES:
@@ -58,9 +55,10 @@ def data():
     with SessionLocal() as db:
         admin = User(name="Admin Pruebas", email="admin@test.co", password_hash=PASSWORD_HASH, role="admin")
         seller = User(name="Taquilla Pruebas", email="taquilla@test.co", password_hash=PASSWORD_HASH, role="taquillero")
+        seller2 = User(name="Taquilla Dos", email="taquilla2@test.co", password_hash=PASSWORD_HASH, role="taquillero")
         company = Company(name="Empresa Pruebas")
         route = Route(origin="Cali", destination="Buga", base_fare=15000, duration_minutes=75)
-        db.add_all([admin, seller, company, route])
+        db.add_all([admin, seller, seller2, company, route])
         db.flush()
         trip = Trip(route_id=route.id, company_id=company.id, bus_capacity=20, bus_plate="TST123",
                     departure_at=datetime.combine(TOMORROW, time(10, 0)))
@@ -92,6 +90,11 @@ def admin_headers(client, data):
 @pytest.fixture
 def seller_headers(client, data):
     return login(client, "taquilla@test.co")
+
+
+@pytest.fixture
+def seller2_headers(client, data):
+    return login(client, "taquilla2@test.co")
 
 
 @pytest.fixture

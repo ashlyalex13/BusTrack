@@ -6,7 +6,7 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Company, Route, Ticket, Trip
+from ..models import Company, Route, SeatHold, Ticket, Trip
 from ..schemas import SeatOut, SeatsOut, TripIn, TripOut
 from ..security import admin_only, staff
 from ..services import day_range, sold_stats, trip_out, trips_out
@@ -71,7 +71,13 @@ def get_seats(trip_id: int, db: Session = Depends(get_db)):
             .where(Ticket.trip_id == trip_id, Ticket.status != "cancelled")
         ).all()
     )
-    seats = [SeatOut(number=n, status=taken.get(n, "free")) for n in range(1, trip.bus_capacity + 1)]
+    held = set(db.scalars(
+        select(SeatHold.seat_number).where(SeatHold.trip_id == trip_id, SeatHold.expires_at > datetime.now())
+    ).all())
+    seats = [
+        SeatOut(number=n, status=taken.get(n) or ("reserved" if n in held else "free"))
+        for n in range(1, trip.bus_capacity + 1)
+    ]
     return SeatsOut(trip=trip_out(trip, len(taken), 0), seats=seats)
 
 

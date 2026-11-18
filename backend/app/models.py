@@ -71,3 +71,12 @@ class Ticket(Base):
 
     trip: Mapped[Trip] = relationship()
     seller: Mapped[User] = relationship()
+
+
+class SeatHold(Base):
+    """Reserva temporal de un asiento por un taquillero (HU03)."""
+    __tablename__ = "seat_holds"
+    trip_id: Mapped[int] = mapped_column(ForeignKey("trips.id"), primary_key=True)
+    seat_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime)

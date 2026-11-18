@@ -10,4 +10,5 @@ DATABASE_URL = os.getenv(
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-jwt-secret-change-me")
 QR_SECRET = os.getenv("QR_SECRET", "dev-qr-secret-change-me")
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "480"))
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+SEAT_HOLD_SECONDS = int(os.getenv("SEAT_HOLD_SECONDS", "120"))  # reserva temporal de asiento (2 min)
+CORS_ORIGINS =os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
