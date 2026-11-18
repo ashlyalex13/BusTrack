@@ -9,8 +9,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Ticket, Trip, User
+from ..models import Ticket, User
 from ..qr import sign
+from .holds import active_hold, lock_trip
 from ..schemas import TicketIn, TicketOut, VerifyIn, VerifyOut
 from ..security import admin_only, staff
 from ..services import day_range, ticket_out
@@ -27,9 +28,7 @@ def sell(data: TicketIn, db: Session = Depends(get_db), user: User = Depends(sta
     2. Vuelve a comprobar el asiento con una lectura bloqueante.
     3. UNIQUE(trip_id, active_seat) en la BD es la red de seguridad final.
     """
-    trip = db.scalars(select(Trip).where(Trip.id == data.trip_id).with_for_update()).first()
-    if not trip:
-        raise HTTPException(404, "Viaje no encontrado")
+    trip = lock_trip(db, data.trip_id)
     if trip.status != "scheduled":
         raise HTTPException(409, "El viaje no está disponible para la venta")
     if not 1 <= data.seat_number <= trip.bus_capacity:
@@ -42,6 +41,9 @@ def sell(data: TicketIn, db: Session = Depends(get_db), user: User = Depends(sta
     ).first()
     if taken:
         raise HTTPException(409, f"El asiento {data.seat_number} ya fue vendido")
+    hold = active_hold(db, trip.id, data.seat_number)
+    if hold and hold.user_id != user.id:
+        raise HTTPException(409, f"El asiento {data.seat_number} está reservado por otra taquilla")
 
     ticket_uuid = str(uuid.uuid4())
     ticket = Ticket(
@@ -56,6 +58,8 @@ def sell(data: TicketIn, db: Session = Depends(get_db), user: User = Depends(sta
         status="sold",
     )
     db.add(ticket)
+    if hold:
+        db.delete(hold)  # la reserva se consume con la venta
     try:
         db.commit()
     except IntegrityError:

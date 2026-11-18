@@ -96,7 +96,17 @@ class TripOut(BaseModel):
 
 class SeatOut(BaseModel):
     number: int
-    status: Literal["free", "sold", "boarded"]
+    status: Literal["free", "reserved", "sold", "boarded"]
+
+
+class HoldIn(BaseModel):
+    seat_number: int
+
+
+class HoldOut(BaseModel):
+    trip_id: int
+    seat_number: int
+    expires_in: int  # segundos restantes (evita depender del reloj del navegador)
 
 
 class SeatsOut(BaseModel):

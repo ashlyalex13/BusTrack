@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { BusFront, Printer, RefreshCw, Ticket, UserRound } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { BusFront, Lock, Printer, RefreshCw, Ticket, UserRound } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { dayLabel, errMsg, hour, money, todayISO } from '../lib/format.js'
 import { AvailabilityBadge, searchQuery, TripSearchForm, TripSummary } from '../components/TripSearch.jsx'
@@ -22,6 +22,9 @@ export default function Taquilla() {
   const [msg, setMsg] = useState(null)
   const [ticket, setTicket] = useState(null)
   const [tickets, setTickets] = useState([])
+  const [hold, setHold] = useState(null) // { seat, until } reserva temporal del asiento seleccionado
+  const [now, setNow] = useState(Date.now())
+  const holdRef = useRef(null)
 
   const loadTrips = useCallback((f = filters) => api(searchQuery(f)).then(setTrips).catch((e) => setMsg({ type: 'error', text: errMsg(e) })), [filters])
 
@@ -29,7 +32,7 @@ export default function Taquilla() {
     const d = await api(`/trips/${id}/seats`)
     setSeatData(d)
     setSeat((s) => {
-      if (s && d.seats[s - 1]?.status !== 'free') {
+      if (s && ['sold', 'boarded'].includes(d.seats[s - 1]?.status)) {
         setMsg({ type: 'warn', text: `El asiento ${s} acaba de ser vendido por otra taquilla. Elige otro.` })
         return null
       }
@@ -50,7 +53,55 @@ export default function Taquilla() {
     return () => clearInterval(timer)
   }, [tripId, loadSeats, loadTickets])
 
-  const selectTrip = (id) => { setTripId(id); setSeat(null); setMsg(null) }
+  // ---- Reserva temporal del asiento (HU03) ----
+  const clearHold = useCallback(() => {
+    holdRef.current = null
+    setHold(null)
+  }, [])
+
+  const releaseHold = useCallback(() => {
+    const h = holdRef.current
+    if (h) api(`/trips/${h.tripId}/holds/${h.seat}`, { method: 'DELETE' }).catch(() => {})
+    clearHold()
+  }, [clearHold])
+
+  useEffect(() => releaseHold, [releaseHold]) // al salir de la taquilla se libera la reserva
+
+  useEffect(() => {
+    if (!hold) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [hold])
+
+  const remaining = hold ? Math.max(0, Math.ceil((hold.until - now) / 1000)) : 0
+  useEffect(() => {
+    if (hold && remaining === 0) {
+      setMsg({ type: 'warn', text: `La reserva del asiento ${hold.seat} expiró. Selecciónalo de nuevo.` })
+      clearHold()
+      setSeat(null)
+    }
+  }, [hold, remaining, clearHold])
+
+  const pickSeat = async (n) => {
+    setMsg(null)
+    if (n === null) {
+      releaseHold()
+      setSeat(null)
+      return
+    }
+    try {
+      const h = await api(`/trips/${tripId}/holds`, { method: 'POST', body: { seat_number: n } })
+      holdRef.current = { tripId, seat: n }
+      setNow(Date.now())
+      setHold({ seat: n, until: Date.now() + h.expires_in * 1000 })
+      setSeat(n)
+    } catch (err) {
+      setMsg({ type: 'error', text: errMsg(err) })
+      loadSeats(tripId)
+    }
+  }
+
+  const selectTrip = (id) => { releaseHold(); setTripId(id); setSeat(null); setMsg(null) }
 
   const sell = async (e) => {
     e.preventDefault()
@@ -59,12 +110,13 @@ export default function Taquilla() {
     try {
       const t = await api('/tickets', { method: 'POST', body: { trip_id: tripId, seat_number: seat, ...pax } })
       setTicket(t)
+      clearHold() // el servidor consume la reserva al vender
       setSeat(null)
       setPax(EMPTY_PAX)
       setMsg({ type: 'success', text: `Tiquete vendido: asiento ${t.seat_number} para ${t.passenger_name}.` })
     } catch (err) {
       setMsg({ type: 'error', text: errMsg(err) })
-      if (err.status === 409) setSeat(null)
+      if (err.status === 409) { clearHold(); setSeat(null) }
     } finally {
       setSelling(false)
       loadSeats(tripId)
@@ -115,12 +167,17 @@ export default function Taquilla() {
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[auto_1fr]">
-                <div className="card p-4"><SeatGrid seats={seatData.seats} selected={seat} onSelect={setSeat} /></div>
+                <div className="card p-4"><SeatGrid seats={seatData.seats} selected={seat} onSelect={pickSeat} /></div>
                 <form onSubmit={sell} className="card space-y-4 p-4">
                   <h3 className="flex items-center gap-2 font-bold"><UserRound size={18} /> Datos del pasajero</h3>
                   {seat ? (
-                    <div className="rounded-lg bg-indigo-50 p-3 text-sm">
-                      Asiento seleccionado: <b className="text-indigo-700">#{seat}</b> · Valor: <b>{money(trip.fare)}</b>
+                    <div className="space-y-1 rounded-lg bg-indigo-50 p-3 text-sm">
+                      <p>Asiento seleccionado: <b className="text-indigo-700">#{seat}</b> · Valor: <b>{money(trip.fare)}</b></p>
+                      {hold && (
+                        <p className={`flex items-center gap-1.5 text-xs font-semibold ${remaining <= 30 ? 'text-rose-600' : 'text-indigo-600'}`}>
+                          <Lock size={13} /> Reservado para ti · expira en {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
+                        </p>
+                      )}
                     </div>
                   ) : <Alert type="info">Selecciona un asiento libre en la grilla.</Alert>}
                   <div>
