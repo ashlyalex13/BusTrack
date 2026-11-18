@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -82,6 +82,20 @@ def list_tickets(
         start, end = day_range(day or date.today())
         q = q.where(Ticket.created_at >= start, Ticket.created_at < end)
     return [ticket_out(t) for t in db.scalars(q.order_by(Ticket.seat_number)).all()]
+
+
+@router.get("/search", response_model=list[TicketOut], dependencies=[Depends(staff)])
+def search_tickets(q: str = Query(..., min_length=3, description="Documento o parte del nombre del pasajero"),
+                   db: Session = Depends(get_db)):
+    """Busca tiquetes por documento exacto o por nombre (para reimprimir, anular o atender reclamos)."""
+    term = q.strip()
+    query = (
+        select(Ticket)
+        .where(or_(Ticket.passenger_doc == term, Ticket.passenger_name.ilike(f"%{term}%")))
+        .order_by(Ticket.created_at.desc())
+        .limit(50)
+    )
+    return [ticket_out(t) for t in db.scalars(query).all()]
 
 
 @router.get("/verify", response_model=VerifyOut, dependencies=[Depends(staff)])
