@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Building2, Bus, CalendarClock, LayoutDashboard, LogIn, LogOut, Route as RouteIcon, ScanLine, Ticket, Users } from 'lucide-react'
+import { Building2, Bus, CalendarClock, FileSearch, LayoutDashboard, LogIn, LogOut, Route as RouteIcon, ScanLine, Ticket, Users } from 'lucide-react'
 import { useAuth } from '../lib/auth.jsx'
 
 export default function Layout() {
@@ -8,7 +8,11 @@ export default function Layout() {
 
   const links = [{ to: '/', label: 'Horarios', icon: CalendarClock, end: true }]
   if (user) {
-    links.push({ to: '/taquilla', label: 'Taquilla', icon: Ticket }, { to: '/verificar', label: 'Verificar QR', icon: ScanLine })
+    links.push(
+      { to: '/taquilla', label: 'Taquilla', icon: Ticket },
+      { to: '/tiquetes', label: 'Tiquetes', icon: FileSearch },
+      { to: '/verificar', label: 'Verificar QR', icon: ScanLine },
+    )
     if (user.role === 'admin') {
       links.push(
         { to: '/admin', label: 'Panel', icon: LayoutDashboard, end: true },
