@@ -71,9 +71,14 @@ Los secretos van en `.env`, que está excluido de Git.
 
 ## Pruebas
 
+Las pruebas automáticas usan una base de datos aislada (`bustrack_test`), que se crea sola con el contenedor.
+Si tu volumen de Docker es anterior a este cambio, créala una vez:
+`docker exec -i bustrack-db mysql -uroot -proot < database/test-db.sql`
+
 ```bash
 cd backend
-python tests/concurrency_test.py 20   # 20 ventas simultáneas del mismo asiento → exactamente 1 éxito
+pytest                                 # suite completa (requiere el contenedor de MySQL en ejecución)
+python tests/concurrency_test.py 20   # demo en vivo contra el servidor: 20 ventas simultáneas → 1 éxito
 ```
 
 ## Estructura
