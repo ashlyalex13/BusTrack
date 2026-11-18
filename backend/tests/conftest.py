@@ -9,8 +9,8 @@ import os
 os.environ["DATABASE_URL"] = os.getenv(
     "TEST_DATABASE_URL", "mysql+pymysql://bustrack:bustrack@127.0.0.1:3307/bustrack_test?charset=utf8mb4"
 )
-os.environ["QR_SECRET"] = "secreto-qr-de-pruebas"
-os.environ["JWT_SECRET"] = "secreto-jwt-de-pruebas"
+os.environ["QR_SECRET"] = "secreto-qr-de-pruebas-con-32-bytes-o-mas"
+os.environ["JWT_SECRET"] = "secreto-jwt-de-pruebas-con-32-bytes-o-mas"
 
 from datetime import date, datetime, time, timedelta  # noqa: E402
 from pathlib import Path  # noqa: E402
@@ -51,11 +51,9 @@ def schema():
 @pytest.fixture
 def data():
     """Datos base: 1 admin, 1 taquillero, 1 empresa, 1 ruta y 1 viaje de 20 asientos para mañana."""
-    with engine.begin() as conn:
-        conn.exec_driver_sql("SET FOREIGN_KEY_CHECKS = 0")
+    with engine.begin() as conn:  # DELETE es mucho más rápido que TRUNCATE en tablas pequeñas
         for table in TABLES:
-            conn.exec_driver_sql(f"TRUNCATE TABLE {table}")
-        conn.exec_driver_sql("SET FOREIGN_KEY_CHECKS = 1")
+            conn.exec_driver_sql(f"DELETE FROM {table}")
 
     with SessionLocal() as db:
         admin = User(name="Admin Pruebas", email="admin@test.co", password_hash=PASSWORD_HASH, role="admin")
