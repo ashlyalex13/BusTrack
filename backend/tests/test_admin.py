@@ -88,6 +88,19 @@ def test_recaudo_coincide_con_la_suma_de_tiquetes(client, admin_headers, data, s
     assert report["by_company"][0]["revenue"] == 3 * data.fare
 
 
+def test_recaudo_por_taquillero(client, admin_headers, data, sell, seller2_headers):
+    sell(1)
+    sell(2)
+    body = {"trip_id": data.trip_id, "seat_number": 3, "passenger_name": "Otra Persona", "passenger_doc": "99887766"}
+    client.post("/api/tickets", json=body, headers=seller2_headers)
+
+    by_seller = client.get(f"/api/reports/daily?date={data.date}", headers=admin_headers).json()["by_seller"]
+    assert by_seller == [
+        {"seller": "Taquilla Pruebas", "tickets": 2, "revenue": 2 * data.fare},
+        {"seller": "Taquilla Dos", "tickets": 1, "revenue": data.fare},
+    ]
+
+
 def test_reporte_filtra_por_fecha(client, admin_headers, data, sell):
     sell(1)
     report = client.get("/api/reports/daily?date=2020-01-01", headers=admin_headers).json()
