@@ -32,6 +32,16 @@ def lock_trip(db: Session, trip_id: int) -> Trip:
     return trip
 
 
+def ensure_on_sale(trip: Trip, seat_number: int) -> None:
+    """Reglas comunes de reserva y venta: viaje programado, que no haya salido y asiento válido."""
+    if trip.status != "scheduled":
+        raise HTTPException(409, "El viaje no está disponible para la venta")
+    if trip.departure_at <= now():
+        raise HTTPException(409, "El viaje ya salió: no se pueden vender ni reservar asientos")
+    if not 1 <= seat_number <= trip.bus_capacity:
+        raise HTTPException(422, f"El asiento debe estar entre 1 y {trip.bus_capacity}")
+
+
 def purge_expired(db: Session, trip_id: int) -> None:
     db.execute(delete(SeatHold).where(SeatHold.trip_id == trip_id, SeatHold.expires_at <= now()))
 
@@ -45,10 +55,7 @@ def active_hold(db: Session, trip_id: int, seat_number: int) -> SeatHold | None:
 def hold_seat(trip_id: int, data: HoldIn, db: Session = Depends(get_db), user: User = Depends(staff)):
     trip = lock_trip(db, trip_id)
     seat = data.seat_number
-    if trip.status != "scheduled":
-        raise HTTPException(409, "El viaje no está disponible para la venta")
-    if not 1 <= seat <= trip.bus_capacity:
-        raise HTTPException(422, f"El asiento debe estar entre 1 y {trip.bus_capacity}")
+    ensure_on_sale(trip, seat)
 
     purge_expired(db, trip_id)
     sold = db.scalar(

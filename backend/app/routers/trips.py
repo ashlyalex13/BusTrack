@@ -84,6 +84,8 @@ def get_seats(trip_id: int, db: Session = Depends(get_db)):
 
 @router.post("", response_model=TripOut, status_code=201, dependencies=[Depends(admin_only)])
 def create_trip(data: TripIn, db: Session = Depends(get_db)):
+    if data.departure_at <= now():
+        raise HTTPException(422, "La fecha y hora de salida deben ser posteriores al momento actual")
     _check_refs(db, data)
     trip = Trip(**data.model_dump())
     db.add(trip)

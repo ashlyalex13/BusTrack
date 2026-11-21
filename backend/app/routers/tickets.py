@@ -12,7 +12,7 @@ from ..clock import now, today
 from ..database import get_db
 from ..models import Ticket, User
 from ..qr import sign
-from .holds import active_hold, lock_trip
+from .holds import active_hold, ensure_on_sale, lock_trip
 from ..schemas import TicketIn, TicketOut, VerifyIn, VerifyOut
 from ..security import admin_only, staff
 from ..services import day_range, ticket_out
@@ -30,10 +30,7 @@ def sell(data: TicketIn, db: Session = Depends(get_db), user: User = Depends(sta
     3. UNIQUE(trip_id, active_seat) en la BD es la red de seguridad final.
     """
     trip = lock_trip(db, data.trip_id)
-    if trip.status != "scheduled":
-        raise HTTPException(409, "El viaje no está disponible para la venta")
-    if not 1 <= data.seat_number <= trip.bus_capacity:
-        raise HTTPException(422, f"El asiento debe estar entre 1 y {trip.bus_capacity}")
+    ensure_on_sale(trip, data.seat_number)
 
     taken = db.scalars(
         select(Ticket.uuid)

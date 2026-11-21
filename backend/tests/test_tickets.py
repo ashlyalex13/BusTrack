@@ -74,7 +74,7 @@ def test_venta_concurrente_solo_una_tiene_exito(data):
         db = SessionLocal()
         try:
             seller = db.get(User, data.seller_id)
-            body = TicketIn(trip_id=data.trip_id, seat_number=5, passenger_name=f"Pasajero {i}", passenger_doc=f"1000{i:04d}")
+            body = TicketIn(trip_id=data.trip_id, seat_number=5, passenger_name=f"Pasajero {chr(65 + i)}", passenger_doc=f"1000{i:04d}")
             barrier.wait()  # todos los hilos salen al mismo tiempo
             sell_endpoint(body, db, seller)
             outcome = 201
