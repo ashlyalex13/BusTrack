@@ -17,7 +17,12 @@ export async function api(path, { method = 'GET', body } = {}) {
   if (token) headers.Authorization = `Bearer ${token}`
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
-  const res = await fetch(`/api${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined })
+  let res
+  try {
+    res = await fetch(`/api${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined })
+  } catch {
+    throw new ApiError(0, 'No se pudo conectar con el servidor. Revisa tu conexión a internet e intenta de nuevo.')
+  }
   if (res.status === 204) return null
   const data = await res.json().catch(() => null)
   if (!res.ok) {

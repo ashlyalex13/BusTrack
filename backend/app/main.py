@@ -3,8 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from .config import CORS_ORIGINS
+from .config import APP_ENV, APP_TIMEZONE, CORS_ORIGINS
+from .logging_config import logger, setup_logging
 from .routers import auth, catalog, holds, reports, tickets, trips
+
+setup_logging()
+logger.info("BusTrack API iniciando (entorno=%s, zona horaria=%s)", APP_ENV, APP_TIMEZONE)
 
 app = FastAPI(
     title="BusTrack API",
@@ -30,8 +34,16 @@ async def security_headers(request: Request, call_next):
 
 
 @app.exception_handler(IntegrityError)
-def integrity_error(_: Request, exc: IntegrityError):
+def integrity_error(request: Request, exc: IntegrityError):
+    logger.warning("Conflicto de integridad en %s %s: %s", request.method, request.url.path, exc.orig)
     return JSONResponse(status_code=409, content={"detail": "El registro ya existe o está en uso por otros datos"})
+
+
+@app.exception_handler(Exception)
+def unexpected_error(request: Request, exc: Exception):
+    """Cualquier error no previsto: se registra con su traza y el cliente recibe un mensaje claro, sin detalles internos."""
+    logger.exception("Error no controlado en %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Ocurrió un error interno. Intenta de nuevo; si persiste, contacta al administrador."})
 
 
 for module in (auth, catalog, trips, holds, tickets, reports):

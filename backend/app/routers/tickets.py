@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..clock import now, today
 from ..database import get_db
+from ..logging_config import logger
 from ..models import Ticket, User
 from ..qr import sign
 from .holds import active_hold, ensure_on_sale, lock_trip
@@ -38,9 +39,12 @@ def sell(data: TicketIn, db: Session = Depends(get_db), user: User = Depends(sta
         .with_for_update()
     ).first()
     if taken:
+        logger.info("Venta rechazada: viaje=%s asiento=%s ya vendido (vendedor=%s)", trip.id, data.seat_number, user.id)
         raise HTTPException(409, f"El asiento {data.seat_number} ya fue vendido")
     hold = active_hold(db, trip.id, data.seat_number)
     if hold and hold.user_id != user.id:
+        logger.info("Venta rechazada: viaje=%s asiento=%s reservado por usuario=%s (vendedor=%s)",
+                    trip.id, data.seat_number, hold.user_id, user.id)
         raise HTTPException(409, f"El asiento {data.seat_number} está reservado por otra taquilla")
 
     ticket_uuid = str(uuid.uuid4())
@@ -62,8 +66,11 @@ def sell(data: TicketIn, db: Session = Depends(get_db), user: User = Depends(sta
         db.commit()
     except IntegrityError:
         db.rollback()
+        logger.warning("Venta rechazada por restricción UNIQUE: viaje=%s asiento=%s", trip.id, data.seat_number)
         raise HTTPException(409, f"El asiento {data.seat_number} ya fue vendido")
     db.refresh(ticket)
+    logger.info("Venta: tiquete=%s viaje=%s asiento=%s vendedor=%s valor=%s",
+                ticket.uuid, trip.id, ticket.seat_number, user.id, ticket.price)
     return ticket_out(ticket, with_qr=True)
 
 
@@ -116,8 +123,8 @@ def get_ticket(ticket_uuid: str, db: Session = Depends(get_db)):
     return ticket_out(t, with_qr=True)
 
 
-@router.post("/{ticket_uuid}/cancel", response_model=TicketOut, dependencies=[Depends(admin_only)])
-def cancel_ticket(ticket_uuid: str, db: Session = Depends(get_db)):
+@router.post("/{ticket_uuid}/cancel", response_model=TicketOut)
+def cancel_ticket(ticket_uuid: str, db: Session = Depends(get_db), user: User = Depends(admin_only)):
     t = db.get(Ticket, ticket_uuid)
     if not t:
         raise HTTPException(404, "Tiquete no encontrado")
@@ -125,28 +132,35 @@ def cancel_ticket(ticket_uuid: str, db: Session = Depends(get_db)):
         raise HTTPException(409, "Solo se pueden anular tiquetes vendidos que no hayan abordado")
     t.status = "cancelled"
     db.commit()
+    logger.info("Anulación: tiquete=%s viaje=%s asiento=%s por usuario=%s", t.uuid, t.trip_id, t.seat_number, user.id)
     return ticket_out(t)
 
 
 def _verify(db: Session, code: str, board: bool) -> VerifyOut:
     code = code.strip()
+
+    def reject(message: str, ticket: Ticket | None = None) -> VerifyOut:
+        logger.warning("QR rechazado (%s): %s", message, code.split(".", 1)[0][:36])
+        return VerifyOut(valid=False, message=message, ticket=ticket_out(ticket) if ticket else None)
+
     if "." not in code:
-        return VerifyOut(valid=False, message="Formato de código inválido")
+        return reject("Formato de código inválido")
     ticket_uuid, signature = code.split(".", 1)
     q = select(Ticket).where(Ticket.uuid == ticket_uuid)
     t = db.scalars(q.with_for_update() if board else q).first()
     if not t:
-        return VerifyOut(valid=False, message="El tiquete no existe")
+        return reject("El tiquete no existe")
     expected = sign(t.uuid, t.trip_id, t.seat_number)
     if not hmac.compare_digest(expected, signature) or not hmac.compare_digest(expected, t.qr_signature):
-        return VerifyOut(valid=False, message="Firma inválida: el código fue alterado")
+        return reject("Firma inválida: el código fue alterado")
     if t.status == "cancelled":
-        return VerifyOut(valid=False, message="El tiquete fue anulado", ticket=ticket_out(t))
+        return reject("El tiquete fue anulado", t)
     if t.status == "boarded":
         when = t.boarded_at.strftime("%d/%m/%Y %H:%M") if t.boarded_at else ""
-        return VerifyOut(valid=False, message=f"El tiquete ya fue usado ({when})", ticket=ticket_out(t))
+        return reject(f"El tiquete ya fue usado ({when})", t)
     if board:
         t.status, t.boarded_at = "boarded", now()
         db.commit()
+        logger.info("Abordaje: tiquete=%s viaje=%s asiento=%s", t.uuid, t.trip_id, t.seat_number)
         return VerifyOut(valid=True, message="Abordaje registrado correctamente", ticket=ticket_out(t))
     return VerifyOut(valid=True, message="Tiquete válido", ticket=ticket_out(t))
