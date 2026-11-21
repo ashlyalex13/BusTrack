@@ -1,7 +1,8 @@
+import re
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ORM(BaseModel):
@@ -119,7 +120,23 @@ class TicketIn(BaseModel):
     trip_id: int
     seat_number: int
     passenger_name: str = Field(min_length=3, max_length=120)
-    passenger_doc: str = Field(min_length=5, max_length=30)
+    passenger_doc: str = Field(min_length=5, max_length=20)
+
+    @field_validator("passenger_name")
+    @classmethod
+    def clean_name(cls, v: str) -> str:
+        v = " ".join(v.split())  # quita espacios repetidos
+        if not re.fullmatch(r"[A-Za-zÀ-ÿÑñ .'-]{3,120}", v) or not re.search(r"[A-Za-zÀ-ÿÑñ]", v):
+            raise ValueError("El nombre solo puede contener letras, espacios, puntos, apóstrofes y guiones")
+        return v
+
+    @field_validator("passenger_doc")
+    @classmethod
+    def clean_doc(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9-]{5,20}", v):
+            raise ValueError("El documento solo puede contener letras, números y guiones (5 a 20 caracteres)")
+        return v
 
 
 class TicketOut(BaseModel):

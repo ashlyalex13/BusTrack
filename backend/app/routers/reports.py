@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ..clock import today
 from ..database import get_db
 from ..models import Ticket, Trip, User
 from ..security import admin_only
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/api/reports", tags=["Reportes"])
 
 @router.get("/daily", dependencies=[Depends(admin_only)])
 def daily_report(day: date | None = Query(None, alias="date"), db: Session = Depends(get_db)):
-    day = day or date.today()
+    day = day or today()
     start, end = day_range(day)
     trips = trips_out(
         db,

@@ -1,10 +1,12 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import ErrorBoundary from './ErrorBoundary.jsx'
 import { Building2, Bus, CalendarClock, FileSearch, LayoutDashboard, LogIn, LogOut, Route as RouteIcon, ScanLine, Ticket, Users } from 'lucide-react'
 import { useAuth } from '../lib/auth.jsx'
 
 export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const links = [{ to: '/', label: 'Horarios', icon: CalendarClock, end: true }]
   if (user) {
@@ -65,7 +67,8 @@ export default function Layout() {
         </div>
       </header>
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
-        <Outlet />
+        {/* key: al cambiar de pantalla se reinicia el estado de error */}
+        <ErrorBoundary key={location.pathname}><Outlet /></ErrorBoundary>
       </main>
       <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
         BusTrack · Sistema de gestión para terminales de transporte terrestre

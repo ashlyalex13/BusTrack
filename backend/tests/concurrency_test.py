@@ -25,7 +25,7 @@ results: list[int] = []
 
 
 def attempt(i: int):
-    body = {"trip_id": trip["id"], "seat_number": seat, "passenger_name": f"Pasajero {i}", "passenger_doc": f"1000{i:04d}"}
+    body = {"trip_id": trip["id"], "seat_number": seat, "passenger_name": f"Pasajero {chr(65 + i)}", "passenger_doc": f"1000{i:04d}"}
     with httpx.Client(timeout=30) as client:
         barrier.wait()  # todas salen al mismo tiempo
         results.append(client.post(f"{API}/tickets", json=body, headers=headers).status_code)

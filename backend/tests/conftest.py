@@ -70,6 +70,13 @@ def data():
         )
 
 
+@pytest.fixture(autouse=True)
+def reset_login_limiter():
+    """Cada prueba arranca sin intentos fallidos acumulados."""
+    from app.rate_limit import login_limiter
+    login_limiter.reset()
+
+
 @pytest.fixture
 def client():
     with TestClient(app) as c:
