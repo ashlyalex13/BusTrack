@@ -8,12 +8,13 @@ cambiar de asiento o de viaje y se consume al vender.
 La garantía contra la doble venta sigue estando en Ticket.sell (FOR UPDATE +
 UNIQUE); la reserva es una mejora de experiencia para no llenar datos en vano.
 """
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from ..clock import now
 from ..config import SEAT_HOLD_SECONDS
 from ..database import get_db
 from ..models import SeatHold, Ticket, Trip, User
@@ -32,12 +33,12 @@ def lock_trip(db: Session, trip_id: int) -> Trip:
 
 
 def purge_expired(db: Session, trip_id: int) -> None:
-    db.execute(delete(SeatHold).where(SeatHold.trip_id == trip_id, SeatHold.expires_at <= datetime.now()))
+    db.execute(delete(SeatHold).where(SeatHold.trip_id == trip_id, SeatHold.expires_at <= now()))
 
 
 def active_hold(db: Session, trip_id: int, seat_number: int) -> SeatHold | None:
     hold = db.get(SeatHold, (trip_id, seat_number))
-    return hold if hold and hold.expires_at > datetime.now() else None
+    return hold if hold and hold.expires_at > now() else None
 
 
 @router.post("/{trip_id}/holds", response_model=HoldOut)
@@ -63,7 +64,7 @@ def hold_seat(trip_id: int, data: HoldIn, db: Session = Depends(get_db), user: U
     db.execute(delete(SeatHold).where(
         SeatHold.trip_id == trip_id, SeatHold.user_id == user.id, SeatHold.seat_number != seat
     ))
-    expires_at = datetime.now() + timedelta(seconds=SEAT_HOLD_SECONDS)
+    expires_at = now() + timedelta(seconds=SEAT_HOLD_SECONDS)
     if existing:
         existing.expires_at = expires_at
     else:

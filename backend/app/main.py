@@ -19,6 +19,16 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Cabeceras básicas de seguridad para todas las respuestas."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
 @app.exception_handler(IntegrityError)
 def integrity_error(_: Request, exc: IntegrityError):
     return JSONResponse(status_code=409, content={"detail": "El registro ya existe o está en uso por otros datos"})

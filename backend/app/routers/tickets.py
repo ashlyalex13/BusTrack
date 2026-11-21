@@ -1,13 +1,14 @@
 """Venta con control de concurrencia y verificación de QR (RF06, RF07, RF10, RNF01)."""
 import hmac
 import uuid
-from datetime import date, datetime
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..clock import now, today
 from ..database import get_db
 from ..models import Ticket, User
 from ..qr import sign
@@ -79,7 +80,7 @@ def list_tickets(
     if trip_id:
         q = q.where(Ticket.trip_id == trip_id)
     else:
-        start, end = day_range(day or date.today())
+        start, end = day_range(day or today())
         q = q.where(Ticket.created_at >= start, Ticket.created_at < end)
     return [ticket_out(t) for t in db.scalars(q.order_by(Ticket.seat_number)).all()]
 
@@ -148,7 +149,7 @@ def _verify(db: Session, code: str, board: bool) -> VerifyOut:
         when = t.boarded_at.strftime("%d/%m/%Y %H:%M") if t.boarded_at else ""
         return VerifyOut(valid=False, message=f"El tiquete ya fue usado ({when})", ticket=ticket_out(t))
     if board:
-        t.status, t.boarded_at = "boarded", datetime.now()
+        t.status, t.boarded_at = "boarded", now()
         db.commit()
         return VerifyOut(valid=True, message="Abordaje registrado correctamente", ticket=ticket_out(t))
     return VerifyOut(valid=True, message="Tiquete válido", ticket=ticket_out(t))

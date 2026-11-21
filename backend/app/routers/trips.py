@@ -1,10 +1,11 @@
 """Viajes: búsqueda pública, viajes del día, grilla de asientos y CRUD (RF01, RF05, RF09)."""
-from datetime import date, datetime
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
+from ..clock import now, today
 from ..database import get_db
 from ..models import Company, Route, SeatHold, Ticket, Trip
 from ..schemas import SeatOut, SeatsOut, TripIn, TripOut
@@ -31,10 +32,10 @@ def search_available(
     db: Session = Depends(get_db),
 ):
     """Trip.searchAvailable(origin, destination, date) — público, sin datos de pasajeros."""
-    day = day or date.today()
+    day = day or today()
     start, end = day_range(day)
-    if day == date.today():
-        start = max(start, datetime.now())  # solo viajes que aún no han salido
+    if day == today():
+        start = max(start, now())  # solo viajes que aún no han salido
     q = (
         select(Trip).join(Route).join(Company)
         .where(Trip.departure_at >= start, Trip.departure_at < end, Trip.status == "scheduled")
@@ -49,12 +50,12 @@ def search_available(
 @router.get("/today", response_model=list[TripOut], dependencies=[Depends(staff)])
 def today_trips(db: Session = Depends(get_db)):
     """Trip.getTodayTrips()"""
-    return list_trips(date.today(), db)
+    return list_trips(today(), db)
 
 
 @router.get("", response_model=list[TripOut], dependencies=[Depends(staff)])
 def list_trips(day: date | None = Query(None, alias="date"), db: Session = Depends(get_db)):
-    start, end = day_range(day or date.today())
+    start, end = day_range(day or today())
     trips = db.scalars(
         select(Trip).where(Trip.departure_at >= start, Trip.departure_at < end).order_by(Trip.departure_at)
     ).all()
@@ -72,7 +73,7 @@ def get_seats(trip_id: int, db: Session = Depends(get_db)):
         ).all()
     )
     held = set(db.scalars(
-        select(SeatHold.seat_number).where(SeatHold.trip_id == trip_id, SeatHold.expires_at > datetime.now())
+        select(SeatHold.seat_number).where(SeatHold.trip_id == trip_id, SeatHold.expires_at > now())
     ).all())
     seats = [
         SeatOut(number=n, status=taken.get(n) or ("reserved" if n in held else "free"))
