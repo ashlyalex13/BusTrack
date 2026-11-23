@@ -44,23 +44,30 @@ export function searchQuery(f) {
 }
 
 export function AvailabilityBadge({ trip }) {
-  if (trip.available === 0) return <span className="badge bg-rose-100 text-rose-700">Agotado</span>
+  if (trip.available === 0) return <span className="badge shrink-0 bg-rose-100 text-rose-700">Agotado</span>
   const cls = trip.available <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-  return <span className={`badge ${cls}`}>{trip.available} disponibles</span>
+  return (
+    <span className={`badge shrink-0 ${cls}`} title={`${trip.available} asientos disponibles`}>
+      {trip.available} <span className="hidden sm:inline">disponibles</span><span className="sm:hidden">libres</span>
+    </span>
+  )
 }
 
 export function TripSummary({ trip }) {
+  // "09:00 p. m." → hora grande y "p. m." pequeño: ocupa un ancho fijo y nunca se parte en dos líneas.
+  const [time, ...period] = hour(trip.departure_at).split(' ')
   return (
-    <div className="flex items-center gap-3">
-      <div className="text-center">
-        <div className="text-lg font-extrabold text-slate-900">{hour(trip.departure_at)}</div>
-        <div className="flex items-center gap-1 text-xs text-slate-500"><Clock size={12} />{duration(trip.duration_minutes)}</div>
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="w-16 shrink-0 text-center">
+        <div className="whitespace-nowrap text-lg font-extrabold leading-tight text-slate-900">{time}</div>
+        <div className="whitespace-nowrap text-[11px] font-semibold uppercase text-slate-500">{period.join(' ')}</div>
       </div>
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-          {trip.origin} <ArrowRight size={14} className="text-slate-400" /> {trip.destination}
+        <div className="flex flex-wrap items-center gap-x-1.5 font-semibold text-slate-800">
+          <span>{trip.origin}</span> <ArrowRight size={14} className="shrink-0 text-slate-400" /> <span>{trip.destination}</span>
         </div>
         <div className="truncate text-xs text-slate-500">{trip.company_name} · {money(trip.fare)}</div>
+        <div className="flex items-center gap-1 text-xs text-slate-400"><Clock size={11} /> {duration(trip.duration_minutes)}</div>
       </div>
     </div>
   )

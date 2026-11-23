@@ -57,7 +57,7 @@ export default function PublicSchedule() {
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {trips?.map((t) => (
-              <div key={t.id} className="card flex items-center justify-between gap-3 p-4 transition hover:shadow-md">
+              <div key={t.id} className="card flex min-w-0 items-center justify-between gap-3 p-4 transition hover:shadow-md">
                 <TripSummary trip={t} />
                 <AvailabilityBadge trip={t} />
               </div>

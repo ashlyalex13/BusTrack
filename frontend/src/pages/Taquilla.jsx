@@ -25,6 +25,7 @@ export default function Taquilla() {
   const [hold, setHold] = useState(null) // { seat, until } reserva temporal del asiento seleccionado
   const [now, setNow] = useState(Date.now())
   const holdRef = useRef(null)
+  const sectionRef = useRef(null)
 
   const loadTrips = useCallback((f = filters) => api(searchQuery(f)).then(setTrips).catch((e) => setMsg({ type: 'error', text: errMsg(e) })), [filters])
 
@@ -101,7 +102,14 @@ export default function Taquilla() {
     }
   }
 
-  const selectTrip = (id) => { releaseHold(); setTripId(id); setSeat(null); setMsg(null) }
+  const selectTrip = (id) => {
+    releaseHold()
+    setTripId(id)
+    setSeat(null)
+    setMsg(null)
+    // En celular/tablet la grilla queda debajo de la lista: se desplaza hasta ella.
+    if (window.innerWidth < 1024) setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
+  }
 
   const sell = async (e) => {
     e.preventDefault()
@@ -132,11 +140,11 @@ export default function Taquilla() {
     <div>
       <PageHeader title="Taquilla" subtitle="Selecciona un viaje, elige el asiento y registra al pasajero." />
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <div className="card p-4">
             <TripSearchForm compact value={filters} onChange={setFilters} onSubmit={() => loadTrips()} />
           </div>
-          <div className="card max-h-[60vh] divide-y divide-slate-100 overflow-y-auto">
+          <div className="card max-h-[45vh] divide-y divide-slate-100 overflow-y-auto lg:max-h-[60vh]">
             {!trips ? <Spinner /> : trips.length === 0 ? (
               <Empty icon={BusFront} title="Sin viajes disponibles">Cambia la fecha o los filtros.</Empty>
             ) : trips.map((t) => (
@@ -149,7 +157,7 @@ export default function Taquilla() {
           </div>
         </aside>
 
-        <section className="space-y-4">
+        <section ref={sectionRef} className="min-w-0 scroll-mt-20 space-y-4">
           {msg && <Alert type={msg.type} onClose={() => setMsg(null)}>{msg.text}</Alert>}
           {!tripId ? (
             <div className="card"><Empty icon={Ticket} title="Ningún viaje seleccionado">Elige un viaje de la lista para ver sus asientos.</Empty></div>
@@ -158,7 +166,7 @@ export default function Taquilla() {
               <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
                 <div>
                   <p className="text-xs text-slate-500">{trip.company_name} · Placa {trip.bus_plate || '—'} · {dayLabel(trip.departure_at)}</p>
-                  <p className="text-xl font-extrabold text-slate-900">{trip.origin} → {trip.destination} · {hour(trip.departure_at)}</p>
+                  <p className="text-lg font-extrabold text-slate-900 sm:text-xl">{trip.origin} → {trip.destination} · {hour(trip.departure_at)}</p>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <span className="flex items-center gap-1 text-slate-500"><RefreshCw size={14} className="animate-spin [animation-duration:3s]" /> En vivo</span>
@@ -167,7 +175,7 @@ export default function Taquilla() {
               </div>
 
               <div className="grid gap-4 xl:grid-cols-[auto_1fr]">
-                <div className="card p-4"><SeatGrid seats={seatData.seats} selected={seat} onSelect={pickSeat} /></div>
+                <div className="card flex justify-center p-4 xl:block"><SeatGrid seats={seatData.seats} selected={seat} onSelect={pickSeat} /></div>
                 <form onSubmit={sell} className="card space-y-4 p-4">
                   <h3 className="flex items-center gap-2 font-bold"><UserRound size={18} /> Datos del pasajero</h3>
                   {seat ? (
