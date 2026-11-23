@@ -62,7 +62,7 @@ export default function Dashboard() {
                     <tbody className="divide-y divide-slate-100">
                       {data.trips.map((t) => (
                         <tr key={t.id} className="hover:bg-slate-50">
-                          <td className="td font-semibold">{hour(t.departure_at)}</td>
+                          <td className="td whitespace-nowrap font-semibold">{hour(t.departure_at)}</td>
                           <td className="td whitespace-nowrap">{t.origin} → {t.destination}</td>
                           <td className="td">{t.company_name}</td>
                           <td className="td"><Occupancy sold={t.sold} capacity={t.bus_capacity} /></td>

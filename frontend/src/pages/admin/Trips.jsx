@@ -27,7 +27,7 @@ export default function Trips() {
         bus_capacity: Number(f.bus_capacity), bus_plate: f.bus_plate || null, status: f.status,
       })}
       columns={[
-        { label: 'Salida', render: (r) => <span className="font-semibold">{hour(r.departure_at)}</span> },
+        { label: 'Salida', render: (r) => <span className="whitespace-nowrap font-semibold">{hour(r.departure_at)}</span> },
         { label: 'Ruta', render: (r) => <span className="whitespace-nowrap">{r.origin} → {r.destination}</span> },
         { label: 'Empresa', key: 'company_name' },
         { label: 'Placa', key: 'bus_plate' },
