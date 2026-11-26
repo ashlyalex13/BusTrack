@@ -72,3 +72,17 @@ CREATE TABLE tickets (
     UNIQUE KEY uq_trip_active_seat (trip_id, active_seat),
     INDEX idx_tickets_created (created_at)
 ) ENGINE=InnoDB;
+
+-- HU03: reserva temporal de un asiento mientras el taquillero registra al
+-- pasajero. Expira sola (expires_at) y un asiento reservado no lo puede
+-- vender otra taquilla.
+CREATE TABLE seat_holds (
+    trip_id      INT NOT NULL,
+    seat_number  INT NOT NULL,
+    user_id      INT NOT NULL,
+    expires_at   DATETIME NOT NULL,
+    PRIMARY KEY (trip_id, seat_number),
+    CONSTRAINT fk_hold_trip FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
+    CONSTRAINT fk_hold_user FOREIGN KEY (user_id) REFERENCES users(id),
+    INDEX idx_holds_expires (expires_at)
+) ENGINE=InnoDB;

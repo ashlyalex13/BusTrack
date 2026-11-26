@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+import math
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..logging_config import logger
 from ..models import User
+from ..rate_limit import login_limiter
 from ..schemas import LoginIn, TokenOut, UserIn, UserOut
 from ..security import admin_only, create_token, get_current_user, hash_password, verify_password
 
@@ -11,12 +15,27 @@ router = APIRouter(prefix="/api", tags=["Autenticación y usuarios"])
 
 
 @router.post("/auth/login", response_model=TokenOut)
-def login(data: LoginIn, db: Session = Depends(get_db)):
-    user = db.scalars(select(User).where(User.email == data.email.strip().lower())).first()
+def login(data: LoginIn, request: Request, db: Session = Depends(get_db)):
+    email = data.email.strip().lower()
+    key = f"{email}|{request.client.host if request.client else 'desconocido'}"
+    wait = login_limiter.retry_after(key)
+    if wait:
+        logger.warning("Login bloqueado por intentos fallidos: %s", key)
+        minutes = math.ceil(wait / 60)
+        raise HTTPException(
+            429, f"Demasiados intentos fallidos. Intenta de nuevo en {minutes} minuto{'s' if minutes > 1 else ''}.",
+            headers={"Retry-After": str(wait)},
+        )
+
+    user = db.scalars(select(User).where(User.email == email)).first()
     if not user or not verify_password(data.password, user.password_hash):
+        login_limiter.register_failure(key)
+        logger.warning("Login fallido: %s", key)
         raise HTTPException(401, "Correo o contraseña incorrectos")
+    login_limiter.reset(key)
     if not user.is_active:
         raise HTTPException(403, "Usuario inactivo")
+    logger.info("Login: usuario=%s rol=%s", user.id, user.role)
     return TokenOut(access_token=create_token(user), user=user)
 
 

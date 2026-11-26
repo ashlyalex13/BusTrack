@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Banknote, Bus, Gauge, Ticket } from 'lucide-react'
+import { Banknote, Bus, Download, Gauge, Ticket, UserRound } from 'lucide-react'
 import { api } from '../../lib/api.js'
+import { downloadCsv } from '../../lib/csv.js'
 import { errMsg, hour, money, todayISO } from '../../lib/format.js'
+
+const STATUS_ES = { scheduled: 'Programado', departed: 'Despachado', cancelled: 'Cancelado' }
+
+function exportCsv(data) {
+  const rows = data.trips.map((t) => [
+    hour(t.departure_at), t.origin, t.destination, t.company_name, t.bus_plate || '', t.bus_capacity, t.sold,
+    t.bus_capacity ? Math.round((t.sold * 100) / t.bus_capacity) : 0, t.revenue, STATUS_ES[t.status] || t.status,
+  ])
+  rows.push(['TOTAL', '', '', '', '', '', data.tickets_sold, data.occupancy, data.revenue, ''])
+  downloadCsv(`bustrack-reporte-${data.date}.csv`,
+    ['Hora', 'Origen', 'Destino', 'Empresa', 'Placa', 'Capacidad', 'Vendidos', 'Ocupación %', 'Recaudo', 'Estado'], rows)
+}
 import { Alert, Empty, Occupancy, PageHeader, Spinner, StatCard, StatusBadge } from '../../components/ui.jsx'
 
 /** HU05: viajes del día y recaudo, filtrable por fecha. */
@@ -22,6 +35,9 @@ export default function Dashboard() {
           <label className="label">Fecha del reporte</label>
           <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
+        <button className="btn btn-ghost" disabled={!data || data.trips.length === 0} onClick={() => exportCsv(data)}>
+          <Download size={16} /> Exportar CSV
+        </button>
       </PageHeader>
       <Alert type="error">{error}</Alert>
       {!data ? <Spinner /> : (
@@ -46,7 +62,7 @@ export default function Dashboard() {
                     <tbody className="divide-y divide-slate-100">
                       {data.trips.map((t) => (
                         <tr key={t.id} className="hover:bg-slate-50">
-                          <td className="td font-semibold">{hour(t.departure_at)}</td>
+                          <td className="td whitespace-nowrap font-semibold">{hour(t.departure_at)}</td>
                           <td className="td whitespace-nowrap">{t.origin} → {t.destination}</td>
                           <td className="td">{t.company_name}</td>
                           <td className="td"><Occupancy sold={t.sold} capacity={t.bus_capacity} /></td>
@@ -60,6 +76,7 @@ export default function Dashboard() {
               )}
             </div>
 
+            <div className="space-y-6">
             <div className="card h-fit overflow-hidden">
               <div className="border-b border-slate-200 px-4 py-3 font-bold">Recaudo por empresa</div>
               <div className="divide-y divide-slate-100">
@@ -74,6 +91,23 @@ export default function Dashboard() {
                 ))}
                 {data.by_company.length === 0 && <p className="p-4 text-sm text-slate-500">Sin datos.</p>}
               </div>
+            </div>
+
+            <div className="card h-fit overflow-hidden">
+              <div className="border-b border-slate-200 px-4 py-3 font-bold">Recaudo por taquillero</div>
+              <div className="divide-y divide-slate-100">
+                {(data.by_seller ?? []).map((s) => (
+                  <div key={s.seller} className="flex items-center justify-between gap-2 p-4">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-sky-100 text-sky-700"><UserRound size={16} /></span>
+                      <div><p className="font-semibold">{s.seller}</p><p className="text-xs text-slate-500">{s.tickets} tiquetes</p></div>
+                    </div>
+                    <span className="font-semibold">{money(s.revenue)}</span>
+                  </div>
+                ))}
+                {!data.by_seller?.length &&<p className="p-4 text-sm text-slate-500">Sin ventas.</p>}
+              </div>
+            </div>
             </div>
           </div>
         </>

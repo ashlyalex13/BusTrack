@@ -1,39 +1,57 @@
-import { useState } from 'react'
-import { CircleCheck, CircleX, ScanLine, Search } from 'lucide-react'
+import { lazy, Suspense, useCallback, useState } from 'react'
+import { Camera, CameraOff, CircleCheck, CircleX, ScanLine, Search } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { dayLabel, errMsg, hour, money } from '../lib/format.js'
-import { Alert, PageHeader, StatusBadge } from '../components/ui.jsx'
+import { Alert, PageHeader, Spinner, StatusBadge } from '../components/ui.jsx'
 
-/** HU04: verificación de tiquete por código QR. */
+// La librería de la cámara pesa ~340 kB: se descarga solo cuando se abre el escáner.
+const QrScanner = lazy(() => import('../components/QrScanner.jsx'))
+
+/** HU04: verificación de tiquete por código QR (cámara, lector USB o código pegado). */
 export default function Verify() {
   const [code, setCode] = useState('')
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [scanning, setScanning] = useState(false)
 
-  const run = async (board) => {
-    if (!code.trim()) return
+  const check = useCallback(async (value, board) => {
+    const clean = value.trim()
+    if (!clean) return
     setLoading(true)
     setError('')
     try {
       setResult(board
-        ? await api('/tickets/verify', { method: 'POST', body: { code } })
-        : await api(`/tickets/verify?code=${encodeURIComponent(code.trim())}`))
+        ? await api('/tickets/verify', { method: 'POST', body: { code: clean } })
+        : await api(`/tickets/verify?code=${encodeURIComponent(clean)}`))
     } catch (e) {
       setError(errMsg(e))
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  const run = (board) => check(code, board)
+
+  // Al leer un QR con la cámara se consulta de inmediato; el abordaje se confirma con el botón.
+  const onScan = useCallback((text) => {
+    setScanning(false)
+    setCode(text)
+    check(text, false)
+  }, [check])
 
   const t = result?.ticket
   return (
     <div className="mx-auto max-w-2xl">
-      <PageHeader title="Verificar tiquete" subtitle="Escanea el QR con un lector (actúa como teclado) o pega el código del tiquete." />
+      <PageHeader title="Verificar tiquete" subtitle="Escanea el QR con la cámara o con un lector, o pega el código del tiquete." />
       <div className="card space-y-4 p-5">
+        <button type="button" className={`btn w-full ${scanning ? 'btn-ghost' : 'btn-accent'}`} onClick={() => setScanning((s) => !s)}>
+          {scanning ? <><CameraOff size={16} /> Cerrar cámara</> : <><Camera size={16} /> Escanear con la cámara</>}
+        </button>
+        {scanning && <Suspense fallback={<Spinner label="Abriendo cámara..." />}><QrScanner onScan={onScan} /></Suspense>}
         <div>
-          <label className="label">Código del tiquete</label>
-          <input className="input font-mono" autoFocus placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.firma" value={code}
+          <label className="label" htmlFor="ticket-code">Código del tiquete</label>
+          <input id="ticket-code" className="input font-mono" autoFocus placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.firma" value={code}
             onChange={(e) => { setCode(e.target.value); setResult(null) }}
             onKeyDown={(e) => e.key === 'Enter' && run(false)} />
         </div>

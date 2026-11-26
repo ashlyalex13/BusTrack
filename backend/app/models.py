@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from .clock import now
 from .database import Base
 
 
@@ -66,8 +67,18 @@ class Ticket(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     qr_signature: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20), default="sold")  # sold | boarded | cancelled
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Hora de la terminal (no la del servidor de BD, que en la nube puede estar en UTC).
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now, server_default=func.now())
     boarded_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     trip: Mapped[Trip] = relationship()
     seller: Mapped[User] = relationship()
+
+
+class SeatHold(Base):
+    """Reserva temporal de un asiento por un taquillero (HU03)."""
+    __tablename__ = "seat_holds"
+    trip_id: Mapped[int] = mapped_column(ForeignKey("trips.id"), primary_key=True)
+    seat_number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime)

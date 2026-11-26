@@ -5,6 +5,7 @@ from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import text
 
+from .clock import today
 from .database import SessionLocal
 from .models import Company, Route, Ticket, Trip, User
 from .qr import sign
@@ -38,7 +39,7 @@ def run():
     random.seed(7)
     db = SessionLocal()
     db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
-    for table in ("tickets", "trips", "routes", "companies", "users"):
+    for table in ("seat_holds", "tickets", "trips", "routes", "companies", "users"):
         db.execute(text(f"TRUNCATE TABLE {table}"))
     db.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 
@@ -51,7 +52,7 @@ def run():
     hours = [5, 7, 9, 11, 13, 15, 17, 19, 21]
     trips = []
     for offset in range(-1, 3):  # ayer, hoy y dos días más
-        day = date.today() + timedelta(days=offset)
+        day = today() + timedelta(days=offset)
         for i, route in enumerate(routes):
             for j, h in enumerate(random.sample(hours, 3)):
                 trips.append(Trip(
@@ -67,7 +68,7 @@ def run():
 
     route_by_id = {r.id: r for r in routes}
     for trip in trips:
-        days_from_today = (trip.departure_at.date() - date.today()).days
+        days_from_today = (trip.departure_at.date() - today()).days
         ratio = {-1: 0.8, 0: 0.45, 1: 0.2}.get(days_from_today, 0.05)
         for seat in random.sample(range(1, trip.bus_capacity + 1), int(trip.bus_capacity * ratio)):
             uid = str(uuid.uuid4())

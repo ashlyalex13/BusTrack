@@ -3,18 +3,41 @@
 Sistema de gestión para terminales de transporte terrestre: rutas, viajes, taquilla con grilla de asientos,
 tiquetes con QR verificable, portal público de horarios y reportes.
 
-**Stack:** MySQL 8 (Docker) · FastAPI + SQLAlchemy · React + Vite + Tailwind CSS
+**Stack:** MySQL 8 · FastAPI + SQLAlchemy · React + Vite + Tailwind CSS · nginx · Docker
 
-## Requisitos
-- Docker Desktop
-- Python 3.11+
-- Node.js 18+
+## Ejecución con Docker (un solo comando)
 
-## Instalación y ejecución
+Requisito: Docker Desktop.
+
+```bash
+docker compose up --build
+```
+
+| Servicio | Contenedor | Acceso |
+|---|---|---|
+| Interfaz web (React servido por nginx) | `bustrack-web` | http://localhost:8080 |
+| API (FastAPI) y documentación Swagger | `bustrack-api` | http://localhost:8080/docs (pasa por nginx) |
+| Base de datos MySQL 8 | `bustrack-db` | `localhost:3307` |
+
+- La primera vez se crea el schema y se cargan **datos de demostración** de forma automática (solo si la base está vacía; reiniciar no borra información).
+- Usuarios demo: `admin@bustrack.co / admin123` (administrador) y `taquilla1@bustrack.co / taquilla123` (taquillero).
+- Orden de arranque garantizado con *healthchecks*: MySQL → API → web.
+- Pruebas dentro del contenedor: `docker compose exec api pytest`
+- Detener: `docker compose down` (conserva los datos) · borrar todo: `docker compose down -v`.
+- Producción: crear un archivo `.env` junto a `docker-compose.yml` con `APP_ENV=production`, `JWT_SECRET`, `QR_SECRET` y `MYSQL_PASSWORD` propios.
+
+```
+Navegador ──► nginx (web:80 → localhost:8080) ──/api, /docs──► FastAPI (api:8000) ──► MySQL (db:3306)
+                    └── archivos estáticos de React
+```
+
+## Ejecución para desarrollo (sin contenedores para la app)
+
+Requisitos: Docker Desktop (solo para MySQL), Python 3.11+ y Node.js 18+.
 
 ```bash
 # 1. Base de datos (crea el schema automáticamente desde database/schema.sql)
-docker compose up -d
+docker compose up -d db
 
 # 2. Backend
 cd backend
@@ -71,20 +94,44 @@ Los secretos van en `.env`, que está excluido de Git.
 
 ## Pruebas
 
+| Capa | Tipo | Herramienta | Cantidad | Qué cubre |
+|---|---|---|---|---|
+| Backend | Unitarias | pytest | 51 | Firma HMAC y QR, contraseñas/JWT/roles, validaciones, servicios, límite de login, secretos, hora |
+| Backend | Integración | pytest + MySQL | 134 | API completa: venta concurrente, reservas, QR, permisos, CRUD, reportes, logs, arranque |
+| Frontend | Unitarias y componentes | Vitest + Testing Library | 43 | Formatos, CSV, cliente API, grilla de asientos, flujos de taquilla, verificación, login y portal |
+
+**Cobertura:** backend 97 %; frontend: módulos principales (taquilla, grilla, verificación, login, cliente API) entre 85 % y 100 %.
+En cada push y Pull Request, **GitHub Actions** (`.github/workflows/ci.yml`) ejecuta todas las pruebas y comprueba que el sistema completo arranque con Docker.
+
 ```bash
-cd backend
-python tests/concurrency_test.py 20   # 20 ventas simultáneas del mismo asiento → exactamente 1 éxito
+# Backend (desde backend/)
+pytest -m unit                       # unitarias: no requieren base de datos
+pytest -m integration                # integración: requiere MySQL (docker compose up -d db)
+pytest --cov=app                     # todas, con reporte de cobertura
+docker compose exec api pytest       # todas, dentro del contenedor
+
+# Frontend (desde frontend/)
+npm test                             # todas las pruebas
+npm run coverage                     # con reporte de cobertura
+
+# Demostración en vivo de concurrencia contra el servidor en ejecución
+python tests/concurrency_test.py 20  # 20 ventas simultáneas del mismo asiento → exactamente 1 éxito
+docker compose exec api python tests/concurrency_test.py 20   # lo mismo, con Docker
 ```
+
+Las pruebas de integración usan una base de datos aislada (`bustrack_test`) que el contenedor crea sola. Si tu volumen
+de Docker es anterior a ese cambio, créala una vez con `docker exec -i bustrack-db mysql -uroot -proot < database/test-db.sql`.
 
 ## Estructura
 
 ```
+docs/                       Manual técnico, manual de usuario, diagrama ER y guía de pruebas
 database/schema.sql         Schema MySQL
 backend/app/
   models.py  schemas.py     Entidades ORM y DTOs (Pydantic)
   security.py  qr.py        JWT/roles y firma HMAC del QR
   services.py               Serialización compartida
-  routers/                  auth, catalog (empresas/rutas), trips, tickets, reports
+  routers/                  auth, catalog (empresas/rutas), trips, holds, tickets, reports
   seed.py                   Datos de demostración
 frontend/src/
   lib/                      Cliente API, auth, formatos
@@ -92,8 +139,18 @@ frontend/src/
   pages/                    Portal público, Login, Taquilla, Verificar, admin/*
 ```
 
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [Manual técnico](docs/manual-tecnico.md) | Arquitectura, decisiones técnicas, API, seguridad, despliegue, configuración y trazabilidad de requisitos |
+| [Diagrama entidad-relación](docs/diagrama-er.md) | Modelo de datos, cardinalidades y restricciones |
+| [Manual de usuario](docs/manual-usuario.md) | Uso del sistema por rol: público, taquillero y administrador |
+| [Guía de pruebas](docs/guia-pruebas.md) | Puesta en marcha y escenarios para verificar el sistema en unos 15 minutos |
+
 ## Próximas mejoras
-- Reserva temporal de asiento (2 min) mientras se registra el pasajero
-- Escaneo de QR con la cámara
-- Anulación de tiquetes desde la UI (el endpoint `POST /api/tickets/{uuid}/cancel` ya existe)
-- Exportar reportes a PDF o Excel
+- Despliegue en la nube con HTTPS
+- Venta en línea para el pasajero con pago electrónico
+- Actualización de la grilla con WebSockets
+- Reportes en PDF y filtros por rango de fechas
+- Pruebas de extremo a extremo en el navegador
