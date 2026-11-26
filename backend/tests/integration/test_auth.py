@@ -3,7 +3,7 @@ import pytest
 
 from app.database import SessionLocal
 from app.models import User
-from tests.conftest import PASSWORD
+from tests.integration.conftest import PASSWORD
 
 
 def test_login_correcto_devuelve_token_y_rol(client, data):

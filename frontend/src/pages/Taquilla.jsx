@@ -189,13 +189,13 @@ export default function Taquilla() {
                     </div>
                   ) : <Alert type="info">Selecciona un asiento libre en la grilla.</Alert>}
                   <div>
-                    <label className="label">Nombre completo *</label>
-                    <input className="input" required minLength={3} value={pax.passenger_name}
+                    <label className="label" htmlFor="pax-name">Nombre completo *</label>
+                    <input id="pax-name" className="input" required minLength={3} value={pax.passenger_name}
                       onChange={(e) => setPax({ ...pax, passenger_name: e.target.value })} />
                   </div>
                   <div>
-                    <label className="label">Documento de identidad *</label>
-                    <input className="input" required minLength={5} inputMode="numeric" value={pax.passenger_doc}
+                    <label className="label" htmlFor="pax-doc">Documento de identidad *</label>
+                    <input id="pax-doc" className="input" required minLength={5} value={pax.passenger_doc}
                       onChange={(e) => setPax({ ...pax, passenger_doc: e.target.value })} />
                   </div>
                   <button className="btn btn-primary w-full py-3" disabled={!seat || selling}>

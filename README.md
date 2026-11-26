@@ -94,15 +94,32 @@ Los secretos van en `.env`, que está excluido de Git.
 
 ## Pruebas
 
-Las pruebas automáticas usan una base de datos aislada (`bustrack_test`), que se crea sola con el contenedor.
-Si tu volumen de Docker es anterior a este cambio, créala una vez:
-`docker exec -i bustrack-db mysql -uroot -proot < database/test-db.sql`
+| Capa | Tipo | Herramienta | Cantidad | Qué cubre |
+|---|---|---|---|---|
+| Backend | Unitarias | pytest | 51 | Firma HMAC y QR, contraseñas/JWT/roles, validaciones, servicios, límite de login, secretos, hora |
+| Backend | Integración | pytest + MySQL | 134 | API completa: venta concurrente, reservas, QR, permisos, CRUD, reportes, logs, arranque |
+| Frontend | Unitarias y componentes | Vitest + Testing Library | 43 | Formatos, CSV, cliente API, grilla de asientos, flujos de taquilla, verificación, login y portal |
+
+**Cobertura:** backend 97 %; frontend: módulos principales (taquilla, grilla, verificación, login, cliente API) entre 85 % y 100 %.
+En cada push y Pull Request, **GitHub Actions** (`.github/workflows/ci.yml`) ejecuta todas las pruebas y comprueba que el sistema completo arranque con Docker.
 
 ```bash
-cd backend
-pytest                                 # suite completa (requiere el contenedor de MySQL en ejecución)
-python tests/concurrency_test.py 20   # demo en vivo contra el servidor: 20 ventas simultáneas → 1 éxito
+# Backend (desde backend/)
+pytest -m unit                       # unitarias: no requieren base de datos
+pytest -m integration                # integración: requiere MySQL (docker compose up -d db)
+pytest --cov=app                     # todas, con reporte de cobertura
+docker compose exec api pytest       # todas, dentro del contenedor
+
+# Frontend (desde frontend/)
+npm test                             # todas las pruebas
+npm run coverage                     # con reporte de cobertura
+
+# Demostración en vivo de concurrencia contra el servidor en ejecución
+python tests/concurrency_test.py 20  # 20 ventas simultáneas del mismo asiento → exactamente 1 éxito
 ```
+
+Las pruebas de integración usan una base de datos aislada (`bustrack_test`) que el contenedor crea sola. Si tu volumen
+de Docker es anterior a ese cambio, créala una vez con `docker exec -i bustrack-db mysql -uroot -proot < database/test-db.sql`.
 
 ## Estructura
 
