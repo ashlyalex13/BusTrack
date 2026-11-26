@@ -50,8 +50,8 @@ export default function Verify() {
         </button>
         {scanning && <Suspense fallback={<Spinner label="Abriendo cámara..." />}><QrScanner onScan={onScan} /></Suspense>}
         <div>
-          <label className="label">Código del tiquete</label>
-          <input className="input font-mono" autoFocus placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.firma" value={code}
+          <label className="label" htmlFor="ticket-code">Código del tiquete</label>
+          <input id="ticket-code" className="input font-mono" autoFocus placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.firma" value={code}
             onChange={(e) => { setCode(e.target.value); setResult(null) }}
             onKeyDown={(e) => e.key === 'Enter' && run(false)} />
         </div>

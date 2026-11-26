@@ -111,14 +111,14 @@ export default function CrudPage({
               }
               return (
                 <div key={f.name}>
-                  <label className="label">{f.label}{required && ' *'}</label>
+                  <label className="label" htmlFor={`campo-${f.name}`}>{f.label}{required && ' *'}</label>
                   {f.type === 'select' ? (
-                    <select className="input" required={required} value={form[f.name] ?? ''} onChange={(e) => set(f.name, e.target.value)}>
+                    <select id={`campo-${f.name}`} className="input" required={required} value={form[f.name] ?? ''} onChange={(e) => set(f.name, e.target.value)}>
                       <option value="">Seleccione...</option>
                       {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   ) : (
-                    <input className="input" type={f.type || 'text'} required={required} min={f.min} step={f.step}
+                    <input id={`campo-${f.name}`} className="input" type={f.type || 'text'} required={required} min={f.min} step={f.step}
                       placeholder={f.placeholder} value={form[f.name] ?? ''} onChange={(e) => set(f.name, e.target.value)} />
                   )}
                   {f.help && <p className="mt-1 text-xs text-slate-400">{f.help}</p>}

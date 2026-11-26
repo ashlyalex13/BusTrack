@@ -13,22 +13,22 @@ export function TripSearchForm({ value, onChange, onSubmit, compact }) {
     <form onSubmit={(e) => { e.preventDefault(); onSubmit() }}
       className={`grid gap-3 ${compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]'}`}>
       <div>
-        <label className="label">Origen</label>
-        <select className="input" value={value.origin} onChange={set('origin')}>
+        <label className="label" htmlFor="search-origin">Origen</label>
+        <select id="search-origin" className="input" value={value.origin} onChange={set('origin')}>
           <option value="">Todos</option>
           {cities.origins.map((c) => <option key={c}>{c}</option>)}
         </select>
       </div>
       <div>
-        <label className="label">Destino</label>
-        <select className="input" value={value.destination} onChange={set('destination')}>
+        <label className="label" htmlFor="search-destination">Destino</label>
+        <select id="search-destination" className="input" value={value.destination} onChange={set('destination')}>
           <option value="">Todos</option>
           {cities.destinations.map((c) => <option key={c}>{c}</option>)}
         </select>
       </div>
       <div className={compact ? 'col-span-2' : ''}>
-        <label className="label">Fecha</label>
-        <input type="date" className="input" value={value.date} onChange={set('date')} />
+        <label className="label" htmlFor="search-date">Fecha</label>
+        <input id="search-date" type="date" className="input" value={value.date} onChange={set('date')} />
       </div>
       <div className={`flex items-end ${compact ? 'col-span-2' : ''}`}>
         <button className="btn btn-primary w-full"><Search size={16} /> Buscar</button>
@@ -55,7 +55,8 @@ export function AvailabilityBadge({ trip }) {
 
 export function TripSummary({ trip }) {
   // "09:00 p. m." → hora grande y "p. m." pequeño: ocupa un ancho fijo y nunca se parte en dos líneas.
-  const [time, ...period] = hour(trip.departure_at).split(' ')
+  // \s también separa espacios no separables (algunos navegadores los usan en "p. m.").
+  const [time, ...period] = hour(trip.departure_at).split(/\s+/)
   return (
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <div className="w-16 shrink-0 text-center">

@@ -38,13 +38,13 @@ export default function Login() {
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="label">Correo</label>
-            <input className="input" type="email" required autoFocus value={form.email}
+            <label className="label" htmlFor="login-email">Correo</label>
+            <input id="login-email" className="input" type="email" required autoFocus autoComplete="username" value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </div>
           <div>
-            <label className="label">Contraseña</label>
-            <input className="input" type="password" required value={form.password}
+            <label className="label" htmlFor="login-password">Contraseña</label>
+            <input id="login-password" className="input" type="password" required autoComplete="current-password" value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })} />
           </div>
           <Alert type="error">{error}</Alert>
