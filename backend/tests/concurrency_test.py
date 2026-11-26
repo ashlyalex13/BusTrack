@@ -2,14 +2,18 @@
 
 Resultado esperado: exactamente 1 venta exitosa (201) y N-1 rechazos (409).
 Uso (con el backend corriendo):  python tests/concurrency_test.py [N]
+Con Docker:                       docker compose exec api python tests/concurrency_test.py 20
+La URL de la API se puede cambiar con la variable de entorno API_URL.
 """
+import os
+import string
 import sys
 import threading
 from collections import Counter
 
 import httpx
 
-API = "http://127.0.0.1:8000/api"
+API = os.getenv("API_URL", "http://127.0.0.1:8000/api")
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 20
 
 token = httpx.post(f"{API}/auth/login", json={"email": "taquilla1@bustrack.co", "password": "taquilla123"}).json()["access_token"]
@@ -25,7 +29,7 @@ results: list[int] = []
 
 
 def attempt(i: int):
-    body = {"trip_id": trip["id"], "seat_number": seat, "passenger_name": f"Pasajero {chr(65 + i)}", "passenger_doc": f"1000{i:04d}"}
+    body = {"trip_id": trip["id"], "seat_number": seat, "passenger_name": f"Pasajero {string.ascii_uppercase[i // 26 % 26]}{string.ascii_uppercase[i % 26]}", "passenger_doc": f"1000{i:04d}"}
     with httpx.Client(timeout=30) as client:
         barrier.wait()  # todas salen al mismo tiempo
         results.append(client.post(f"{API}/tickets", json=body, headers=headers).status_code)
