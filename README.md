@@ -116,6 +116,7 @@ npm run coverage                     # con reporte de cobertura
 
 # Demostración en vivo de concurrencia contra el servidor en ejecución
 python tests/concurrency_test.py 20  # 20 ventas simultáneas del mismo asiento → exactamente 1 éxito
+docker compose exec api python tests/concurrency_test.py 20   # lo mismo, con Docker
 ```
 
 Las pruebas de integración usan una base de datos aislada (`bustrack_test`) que el contenedor crea sola. Si tu volumen
@@ -124,12 +125,13 @@ de Docker es anterior a ese cambio, créala una vez con `docker exec -i bustrack
 ## Estructura
 
 ```
+docs/                       Manual técnico, manual de usuario, diagrama ER y guía de pruebas
 database/schema.sql         Schema MySQL
 backend/app/
   models.py  schemas.py     Entidades ORM y DTOs (Pydantic)
   security.py  qr.py        JWT/roles y firma HMAC del QR
   services.py               Serialización compartida
-  routers/                  auth, catalog (empresas/rutas), trips, tickets, reports
+  routers/                  auth, catalog (empresas/rutas), trips, holds, tickets, reports
   seed.py                   Datos de demostración
 frontend/src/
   lib/                      Cliente API, auth, formatos
@@ -137,8 +139,18 @@ frontend/src/
   pages/                    Portal público, Login, Taquilla, Verificar, admin/*
 ```
 
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [Manual técnico](docs/manual-tecnico.md) | Arquitectura, decisiones técnicas, API, seguridad, despliegue, configuración y trazabilidad de requisitos |
+| [Diagrama entidad-relación](docs/diagrama-er.md) | Modelo de datos, cardinalidades y restricciones |
+| [Manual de usuario](docs/manual-usuario.md) | Uso del sistema por rol: público, taquillero y administrador |
+| [Guía de pruebas](docs/guia-pruebas.md) | Puesta en marcha y escenarios para verificar el sistema en unos 15 minutos |
+
 ## Próximas mejoras
-- Reserva temporal de asiento (2 min) mientras se registra el pasajero
-- Escaneo de QR con la cámara
-- Anulación de tiquetes desde la UI (el endpoint `POST /api/tickets/{uuid}/cancel` ya existe)
-- Exportar reportes a PDF o Excel
+- Despliegue en la nube con HTTPS
+- Venta en línea para el pasajero con pago electrónico
+- Actualización de la grilla con WebSockets
+- Reportes en PDF y filtros por rango de fechas
+- Pruebas de extremo a extremo en el navegador

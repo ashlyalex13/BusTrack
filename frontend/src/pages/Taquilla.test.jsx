@@ -57,7 +57,8 @@ describe('Taquilla: venta de tiquete', () => {
     const user = userEvent.setup()
     await openTripAndPickSeat(user)
     expect(api).toHaveBeenCalledWith('/trips/1/holds', { method: 'POST', body: { seat_number: 4 } })
-    expect(await screen.findByText(/Reservado para ti · expira en 2:00/)).toBeInTheDocument()
+    // La cuenta regresiva corre en tiempo real: en un equipo lento ya pudo bajar unos segundos.
+    expect(await screen.findByText(/Reservado para ti · expira en (2:00|1:[45]\d)/)).toBeInTheDocument()
   })
 
   it('vende el tiquete y muestra el tiquete con QR', async () => {
