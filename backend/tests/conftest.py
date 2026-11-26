@@ -19,6 +19,7 @@ from types import SimpleNamespace  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.clock import today  # noqa: E402
 from app.database import SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Company, Route, Trip, User  # noqa: E402
@@ -28,7 +29,7 @@ SCHEMA = Path(__file__).resolve().parents[2] / "database" / "schema.sql"
 TABLES = ("seat_holds", "tickets", "trips", "routes", "companies", "users")
 PASSWORD = "clave123"
 PASSWORD_HASH = hash_password(PASSWORD)  # se calcula una sola vez (bcrypt es lento a propósito)
-TOMORROW = date.today() + timedelta(days=1)
+TOMORROW = today() + timedelta(days=1)  # hora de la terminal, no la del servidor
 
 
 @pytest.fixture(scope="session", autouse=True)

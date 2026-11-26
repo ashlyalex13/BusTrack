@@ -1,6 +1,7 @@
 """HU03: la grilla muestra asientos reservados; la reserva temporal bloquea a las demás taquillas y expira sola."""
-from datetime import datetime, timedelta
+from datetime import timedelta
 
+from app.clock import now
 from app.database import SessionLocal
 from app.models import SeatHold
 
@@ -40,7 +41,7 @@ def test_quien_reserva_si_puede_vender_y_la_reserva_se_consume(client, data, sel
 def test_reserva_expirada_ya_no_bloquea(client, data, seller_headers, seller2_headers):
     hold(client, seller_headers, data.trip_id, 8)
     with SessionLocal() as db:
-        db.get(SeatHold, (data.trip_id, 8)).expires_at = datetime.now() - timedelta(seconds=1)
+        db.get(SeatHold, (data.trip_id, 8)).expires_at = now() - timedelta(seconds=1)
         db.commit()
     assert seat_status(client, data.trip_id, 8) == "free"
     assert hold(client, seller2_headers, data.trip_id, 8).status_code == 200

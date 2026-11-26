@@ -3,18 +3,41 @@
 Sistema de gestión para terminales de transporte terrestre: rutas, viajes, taquilla con grilla de asientos,
 tiquetes con QR verificable, portal público de horarios y reportes.
 
-**Stack:** MySQL 8 (Docker) · FastAPI + SQLAlchemy · React + Vite + Tailwind CSS
+**Stack:** MySQL 8 · FastAPI + SQLAlchemy · React + Vite + Tailwind CSS · nginx · Docker
 
-## Requisitos
-- Docker Desktop
-- Python 3.11+
-- Node.js 18+
+## Ejecución con Docker (un solo comando)
 
-## Instalación y ejecución
+Requisito: Docker Desktop.
+
+```bash
+docker compose up --build
+```
+
+| Servicio | Contenedor | Acceso |
+|---|---|---|
+| Interfaz web (React servido por nginx) | `bustrack-web` | http://localhost:8080 |
+| API (FastAPI) y documentación Swagger | `bustrack-api` | http://localhost:8080/docs (pasa por nginx) |
+| Base de datos MySQL 8 | `bustrack-db` | `localhost:3307` |
+
+- La primera vez se crea el schema y se cargan **datos de demostración** de forma automática (solo si la base está vacía; reiniciar no borra información).
+- Usuarios demo: `admin@bustrack.co / admin123` (administrador) y `taquilla1@bustrack.co / taquilla123` (taquillero).
+- Orden de arranque garantizado con *healthchecks*: MySQL → API → web.
+- Pruebas dentro del contenedor: `docker compose exec api pytest`
+- Detener: `docker compose down` (conserva los datos) · borrar todo: `docker compose down -v`.
+- Producción: crear un archivo `.env` junto a `docker-compose.yml` con `APP_ENV=production`, `JWT_SECRET`, `QR_SECRET` y `MYSQL_PASSWORD` propios.
+
+```
+Navegador ──► nginx (web:80 → localhost:8080) ──/api, /docs──► FastAPI (api:8000) ──► MySQL (db:3306)
+                    └── archivos estáticos de React
+```
+
+## Ejecución para desarrollo (sin contenedores para la app)
+
+Requisitos: Docker Desktop (solo para MySQL), Python 3.11+ y Node.js 18+.
 
 ```bash
 # 1. Base de datos (crea el schema automáticamente desde database/schema.sql)
-docker compose up -d
+docker compose up -d db
 
 # 2. Backend
 cd backend
